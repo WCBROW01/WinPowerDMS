@@ -26,9 +26,8 @@ BOOL DisplayModeEquals(const DISPLAY_MODE* a, const DISPLAY_MODE* b) {
 #define MODE_SELECTED(mode) (!DisplayModeEquals(&mode, &(DISPLAY_MODE) { 0 }))
 
 // I hate parsing the string here, but the alternative requires extra memory management.
-static DISPLAY_MODE GetModeFromCB(HWND hDlg, int nIDDlgItem) {
+static DISPLAY_MODE GetModeFromCB(HWND hComboBox) {
     DISPLAY_MODE mode = { 0 };
-    HWND hComboBox = GetDlgItem(hDlg, nIDDlgItem);
     size_t selectedIndex = SendMessage(hComboBox, CB_GETCURSEL, 0, 0);
     if (selectedIndex != CB_ERR) {
         LRESULT len = SendMessage(hComboBox, CB_GETLBTEXTLEN, selectedIndex, 0);
@@ -125,14 +124,16 @@ static void TestDisplayMode(HWND hDlg, DISPLAY_MODE* mode) {
 typedef struct {
     DISPLAY_MODE modeBatt;
     DISPLAY_MODE modeAC;
-    DWORD disableBatteryWarning; // not used yet
-    BOOL runAtStartup; // not used yet
+    DWORD disableBatteryWarning;
+    BOOL runAtStartup;
 } WINPOWERDMS_PREFS;
 
 static WINPOWERDMS_PREFS userPrefs = { 0 };
 
 // Save user preferences to registry.
 static BOOL SavePrefs(void) {
+    BOOL saved = FALSE;
+
     HKEY regKey;
     if (!RegCreateKeyEx(
         HKEY_CURRENT_USER, L"SOFTWARE\\WinPowerDMS", 0, NULL,
@@ -145,13 +146,26 @@ static BOOL SavePrefs(void) {
         RegSetKeyValue(regKey, L"AC Power", L"Height", REG_DWORD, &userPrefs.modeAC.height, sizeof(userPrefs.modeAC.height));
         RegSetKeyValue(regKey, L"AC Power", L"Refresh Rate", REG_DWORD, &userPrefs.modeAC.refresh, sizeof(userPrefs.modeAC.refresh));
         RegSetValueEx(regKey, L"Disable Battery Warning", 0, REG_DWORD, &userPrefs.disableBatteryWarning, sizeof(userPrefs.disableBatteryWarning));
-        return TRUE;
+        RegCloseKey(regKey);
+        saved = TRUE;
     }
-    else return FALSE;
+
+    // Create the startup entry
+    if (userPrefs.runAtStartup) {
+        WCHAR exePath[MAX_PATH];
+        DWORD exePathLen = GetModuleFileName(NULL, exePath, sizeof(exePath) / sizeof(exePath[0])) + 1;
+        RegSetKeyValue(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", L"WinPowerDMS", REG_SZ, exePath, exePathLen);
+    }
+    else { // Delete the startup entry
+        RegDeleteKeyValue(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", L"WinPowerDMS");
+    }
+    return saved;
 }
 
 // Load user preferences from registry.
 static BOOL LoadPrefs(void) {
+    BOOL loaded = FALSE;
+
     HKEY regKey;
     if (!RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\WinPowerDMS", 0, KEY_READ, &regKey)) {
         DWORD keySize = sizeof(userPrefs.modeBatt.width);
@@ -168,9 +182,15 @@ static BOOL LoadPrefs(void) {
         RegGetValue(regKey, L"AC Power", L"Refresh Rate", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.refresh, &keySize);
         keySize = sizeof(userPrefs.disableBatteryWarning);
         RegGetValue(regKey, NULL, L"Disable Battery Warning", RRF_RT_REG_DWORD, NULL, &userPrefs.disableBatteryWarning, &keySize);
-        return TRUE;
+        RegCloseKey(regKey);
+        loaded = TRUE;
     }
-    else return FALSE;
+
+    // Figure out if application has a startup entry
+    if (!RegGetValue(HKEY_CURRENT_USER, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", L"WinPowerDMS", RRF_RT_ANY, NULL, NULL, NULL))
+        userPrefs.runAtStartup = TRUE;
+    
+    return loaded;
 }
 
 static DISPLAY_MODE GetCurrentDisplayMode(void) {
@@ -184,11 +204,13 @@ static DISPLAY_MODE GetCurrentDisplayMode(void) {
 }
 
 static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+    HWND hComboBatt = GetDlgItem(hDlg, IDC_COMBO_BATT);
+    HWND hComboAC = GetDlgItem(hDlg, IDC_COMBO_AC);
+    HWND hCheckBattWarning = GetDlgItem(hDlg, IDC_CHECK_BATT_WARNING);
+    HWND hCheckStartup = GetDlgItem(hCheckBattWarning, IDC_CHECK_STARTUP);
+
     switch (message) {
     case WM_INITDIALOG: {
-        HWND hComboBatt = GetDlgItem(hDlg, IDC_COMBO_BATT);
-        HWND hComboAC = GetDlgItem(hDlg, IDC_COMBO_AC);
-
         // devMode object that will be enumerated
         DEVMODE devMode;
         ZeroMemory(&devMode, sizeof(devMode));
@@ -223,6 +245,9 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
                 lastMode = currentMode;
             }
         }
+
+        SendMessage(hCheckBattWarning, BM_SETCHECK, userPrefs.disableBatteryWarning ? BST_CHECKED : BST_UNCHECKED, 0);
+        SendMessage(hCheckStartup, BM_SETCHECK, userPrefs.runAtStartup ? BST_CHECKED : BST_UNCHECKED, 0);
         return TRUE;
     }
 
@@ -230,8 +255,10 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         switch (LOWORD(wParam)) {
         case IDC_BUTTON_APPLY:
         case IDOK: {
-            userPrefs.modeBatt = GetModeFromCB(hDlg, IDC_COMBO_BATT);
-            userPrefs.modeAC = GetModeFromCB(hDlg, IDC_COMBO_AC);
+            userPrefs.modeBatt = GetModeFromCB(hComboBatt);
+            userPrefs.modeAC = GetModeFromCB(hComboAC);
+            userPrefs.disableBatteryWarning = SendMessage(hCheckBattWarning, BM_GETCHECK, 0, 0) == BST_CHECKED;
+            userPrefs.runAtStartup = SendMessage(hCheckStartup, BM_GETCHECK, 0, 0) == BST_CHECKED;
             SavePrefs();
             if (LOWORD(wParam) == IDC_BUTTON_APPLY) return TRUE;
         }
@@ -240,12 +267,12 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
             return TRUE;
         }
         case IDC_BUTTON_TEST_BATT: {
-            DISPLAY_MODE mode = GetModeFromCB(hDlg, IDC_COMBO_BATT);
+            DISPLAY_MODE mode = GetModeFromCB(hComboBatt);
             TestDisplayMode(hDlg, &mode);
             return TRUE;
         }
         case IDC_BUTTON_TEST_AC: {
-            DISPLAY_MODE mode = GetModeFromCB(hDlg, IDC_COMBO_AC);
+            DISPLAY_MODE mode = GetModeFromCB(hComboAC);
             TestDisplayMode(hDlg, &mode);
             return TRUE;
         }

@@ -8,7 +8,7 @@ This is a simple C program written using Visual Studio 2022 that has no external
 
 ## TODO
 - [x] Save preferences to the Windows registry.
-- [ ] Add a checkbox to preferences for starting at login.
+- [x] Add a checkbox to preferences for starting at login.
 - [ ] Add an icon.
 - [ ] Add behavior for when multiple displays are connected.
 - [x] Warn the user when the system has no battery.
