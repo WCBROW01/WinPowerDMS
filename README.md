@@ -11,6 +11,6 @@ This is a simple C program written using Visual Studio 2022 that has no external
 - [ ] Add a checkbox to preferences for starting at login.
 - [ ] Add an icon.
 - [ ] Add behavior for when multiple displays are connected.
-- [ ] Block program from running when the system has no battery.
+- [x] Warn the user when the system has no battery.
 - [x] Make the default display mode the current one instead of the highest resolution if there are no preferences set.
 - [ ] Make an actual about dialog.

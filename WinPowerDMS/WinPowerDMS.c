@@ -125,6 +125,8 @@ static void TestDisplayMode(HWND hDlg, DISPLAY_MODE* mode) {
 typedef struct {
     DISPLAY_MODE modeBatt;
     DISPLAY_MODE modeAC;
+    DWORD disableBatteryWarning; // not used yet
+    BOOL runAtStartup; // not used yet
 } WINPOWERDMS_PREFS;
 
 static WINPOWERDMS_PREFS userPrefs = { 0 };
@@ -142,6 +144,7 @@ static BOOL SavePrefs(void) {
         RegSetKeyValue(regKey, L"AC Power", L"Width", REG_DWORD, &userPrefs.modeAC.width, sizeof(userPrefs.modeAC.width));
         RegSetKeyValue(regKey, L"AC Power", L"Height", REG_DWORD, &userPrefs.modeAC.height, sizeof(userPrefs.modeAC.height));
         RegSetKeyValue(regKey, L"AC Power", L"Refresh Rate", REG_DWORD, &userPrefs.modeAC.refresh, sizeof(userPrefs.modeAC.refresh));
+        RegSetValueEx(regKey, L"Disable Battery Warning", 0, REG_DWORD, &userPrefs.disableBatteryWarning, sizeof(userPrefs.disableBatteryWarning));
         return TRUE;
     }
     else return FALSE;
@@ -151,18 +154,20 @@ static BOOL SavePrefs(void) {
 static BOOL LoadPrefs(void) {
     HKEY regKey;
     if (!RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\WinPowerDMS", 0, KEY_READ, &regKey)) {
-        DWORD keySize = sizeof(DWORD);
+        DWORD keySize = sizeof(userPrefs.modeBatt.width);
         RegGetValue(regKey, L"Battery", L"Width", RRF_RT_REG_DWORD, NULL, &userPrefs.modeBatt.width, &keySize);
-        keySize = sizeof(DWORD);
+        keySize = sizeof(userPrefs.modeBatt.height);
         RegGetValue(regKey, L"Battery", L"Height", RRF_RT_REG_DWORD, NULL, &userPrefs.modeBatt.height, &keySize);
-        keySize = sizeof(DWORD);
+        keySize = sizeof(userPrefs.modeBatt.refresh);
         RegGetValue(regKey, L"Battery", L"Refresh Rate", RRF_RT_REG_DWORD, NULL, &userPrefs.modeBatt.refresh, &keySize);
-        keySize = sizeof(DWORD);
+        keySize = sizeof(userPrefs.modeAC.width);
         RegGetValue(regKey, L"AC Power", L"Width", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.width, &keySize);
-        keySize = sizeof(DWORD);
+        keySize = sizeof(userPrefs.modeAC.height);
         RegGetValue(regKey, L"AC Power", L"Height", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.height, &keySize);
-        keySize = sizeof(DWORD);
+        keySize = sizeof(userPrefs.modeAC.refresh);
         RegGetValue(regKey, L"AC Power", L"Refresh Rate", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.refresh, &keySize);
+        keySize = sizeof(userPrefs.disableBatteryWarning);
+        RegGetValue(regKey, NULL, L"Disable Battery Warning", RRF_RT_REG_DWORD, NULL, &userPrefs.disableBatteryWarning, &keySize);
         return TRUE;
     }
     else return FALSE;
@@ -278,7 +283,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             DialogBox(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_PREFSDIALOG), hWnd, PrefsDialogProc);
             break;
         case ID_TRAY_ABOUT:
-            MessageBoxW(NULL, L"WinPowerDMS\nA utility for switching the resolution of your laptop's display based on the current power state.", L"About", MB_OK | MB_ICONINFORMATION);
+            MessageBoxW(hWnd, L"WinPowerDMS\nA utility for switching the resolution of your laptop's display based on the current power state.", L"About", MB_OK | MB_ICONINFORMATION);
             break;
         case ID_TRAY_EXIT:
             DestroyWindow(hWnd);
@@ -296,8 +301,8 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             OutputDebugString(L"Power status changed\n");
             DISPLAY_MODE currentMode = GetCurrentDisplayMode();
             SYSTEM_POWER_STATUS powerStatus;
-            // Change display mode only if there is a battery present and the current display mode is one of the configured options.
-            if (GetSystemPowerStatus(&powerStatus) && powerStatus.BatteryFlag != 128 &&
+            // Change display mode only if the current display mode is one of the configured options.
+            if (GetSystemPowerStatus(&powerStatus) &&
                 (DisplayModeEquals(&currentMode, &userPrefs.modeBatt) || DisplayModeEquals(&currentMode, &userPrefs.modeAC)))
             {
                 ChangeDisplayMode(powerStatus.ACLineStatus ? &userPrefs.modeAC : &userPrefs.modeBatt, CDS_UPDATEREGISTRY);
@@ -327,6 +332,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     HWND hWnd = CreateWindowEx(0, L"TrayAppClass", NULL, 0, 0, 0, 0, 0,
         HWND_MESSAGE, NULL, hInstance, NULL);
     RegisterPowerSettingNotification(hWnd, &GUID_ACDC_POWER_SOURCE, DEVICE_NOTIFY_WINDOW_HANDLE);
+    
+    // Check if there is a battery in the system and display a warning message if there isn't one.
+    SYSTEM_POWER_STATUS powerStatus;
+    if (!userPrefs.disableBatteryWarning && GetSystemPowerStatus(&powerStatus) && powerStatus.BatteryFlag == 128)
+        MessageBox(hWnd, L"There is no battery present in the system. The program will start and set your display mode to what you have set for AC power, but do nothing else afterwards.", L"WinPowerDMS", MB_OK | MB_ICONWARNING);
 
     // Create context menu
     hMenu = CreatePopupMenu();
