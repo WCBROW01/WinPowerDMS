@@ -168,6 +168,16 @@ static BOOL LoadPrefs(void) {
     else return FALSE;
 }
 
+static DISPLAY_MODE GetCurrentDisplayMode(void) {
+    DEVMODE currentMode = { .dmSize = sizeof(currentMode) };
+    EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &currentMode);
+    return (DISPLAY_MODE) {
+        .width = currentMode.dmPelsWidth,
+        .height = currentMode.dmPelsHeight,
+        .refresh = currentMode.dmDisplayFrequency
+    };
+}
+
 static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_INITDIALOG: {
@@ -284,8 +294,12 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
     case WM_POWERBROADCAST:
         if (LOWORD(wParam) == PBT_POWERSETTINGCHANGE) {
             OutputDebugString(L"Power status changed\n");
+            DISPLAY_MODE currentMode = GetCurrentDisplayMode();
             SYSTEM_POWER_STATUS powerStatus;
-            if (GetSystemPowerStatus(&powerStatus)) {
+            // Change display mode only if there is a battery present and the current display mode is one of the configured options.
+            if (GetSystemPowerStatus(&powerStatus) && powerStatus.BatteryFlag != 128 &&
+                (DisplayModeEquals(&currentMode, &userPrefs.modeBatt) || DisplayModeEquals(&currentMode, &userPrefs.modeAC)))
+            {
                 ChangeDisplayMode(powerStatus.ACLineStatus ? &userPrefs.modeAC : &userPrefs.modeBatt, CDS_UPDATEREGISTRY);
             }
         }
@@ -296,15 +310,9 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     if (!LoadPrefs()) { // set both battery and AC to current display mode if there are no preferences set
-        DEVMODE currentMode = { .dmSize = sizeof(currentMode) };
-        EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &currentMode);
-        DISPLAY_MODE mode = {
-            .width = currentMode.dmPelsWidth,
-            .height = currentMode.dmPelsHeight,
-            .refresh = currentMode.dmDisplayFrequency
-        };
-        userPrefs.modeAC = mode;
-        userPrefs.modeBatt = mode;
+        DISPLAY_MODE currentMode = GetCurrentDisplayMode();
+        userPrefs.modeAC = currentMode;
+        userPrefs.modeBatt = currentMode;
     }
 
     InitCommonControls(); // Initialize modern controls
