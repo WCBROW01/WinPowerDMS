@@ -7,10 +7,10 @@ Currently a work in progress. Not very useful yet since it doesn't save your pre
 This is a simple C program written using Visual Studio 2022 that has no external dependencies. It should support Windows Vista or higher, but this hasn't been tested yet.
 
 ## TODO
-- [ ] Save preferences to the Windows registry.
+- [x] Save preferences to the Windows registry.
 - [ ] Add a checkbox to preferences for starting at login.
 - [ ] Add an icon.
 - [ ] Add behavior for when multiple displays are connected.
 - [ ] Block program from running when the system has no battery.
-- [ ] Make the default display mode the current one instead of the highest resolution if there are no preferences set.
+- [x] Make the default display mode the current one instead of the highest resolution if there are no preferences set.
 - [ ] Make an actual about dialog.

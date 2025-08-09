@@ -14,13 +14,10 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 #define TRAY_ICON_ID 1001
 
 typedef struct {
-    int width;
-    int height;
-    int refresh;
+    DWORD width;
+    DWORD height;
+    DWORD refresh;
 } DISPLAY_MODE;
-
-static DISPLAY_MODE modeBatt = { 0 };
-static DISPLAY_MODE modeAC = { 0 };
 
 BOOL DisplayModeEquals(const DISPLAY_MODE* a, const DISPLAY_MODE* b) {
     return a->width == b->width && a->height == b->height && a->refresh == b->refresh;
@@ -125,6 +122,52 @@ static void TestDisplayMode(HWND hDlg, DISPLAY_MODE* mode) {
     }
 }
 
+typedef struct {
+    DISPLAY_MODE modeBatt;
+    DISPLAY_MODE modeAC;
+} WINPOWERDMS_PREFS;
+
+static WINPOWERDMS_PREFS userPrefs = { 0 };
+
+// Save user preferences to registry.
+static BOOL SavePrefs(void) {
+    HKEY regKey;
+    if (!RegCreateKeyEx(
+        HKEY_CURRENT_USER, L"SOFTWARE\\WinPowerDMS", 0, NULL,
+        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &regKey, NULL
+    )) {
+        RegSetKeyValue(regKey, L"Battery", L"Width", REG_DWORD, &userPrefs.modeBatt.width, sizeof(userPrefs.modeBatt.width));
+        RegSetKeyValue(regKey, L"Battery", L"Height", REG_DWORD, &userPrefs.modeBatt.height, sizeof(userPrefs.modeBatt.height));
+        RegSetKeyValue(regKey, L"Battery", L"Refresh Rate", REG_DWORD, &userPrefs.modeBatt.refresh, sizeof(userPrefs.modeBatt.refresh));
+        RegSetKeyValue(regKey, L"AC Power", L"Width", REG_DWORD, &userPrefs.modeAC.width, sizeof(userPrefs.modeAC.width));
+        RegSetKeyValue(regKey, L"AC Power", L"Height", REG_DWORD, &userPrefs.modeAC.height, sizeof(userPrefs.modeAC.height));
+        RegSetKeyValue(regKey, L"AC Power", L"Refresh Rate", REG_DWORD, &userPrefs.modeAC.refresh, sizeof(userPrefs.modeAC.refresh));
+        return TRUE;
+    }
+    else return FALSE;
+}
+
+// Load user preferences from registry.
+static BOOL LoadPrefs(void) {
+    HKEY regKey;
+    if (!RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\WinPowerDMS", 0, KEY_READ, &regKey)) {
+        DWORD keySize = sizeof(DWORD);
+        RegGetValue(regKey, L"Battery", L"Width", RRF_RT_REG_DWORD, NULL, &userPrefs.modeBatt.width, &keySize);
+        keySize = sizeof(DWORD);
+        RegGetValue(regKey, L"Battery", L"Height", RRF_RT_REG_DWORD, NULL, &userPrefs.modeBatt.height, &keySize);
+        keySize = sizeof(DWORD);
+        RegGetValue(regKey, L"Battery", L"Refresh Rate", RRF_RT_REG_DWORD, NULL, &userPrefs.modeBatt.refresh, &keySize);
+        keySize = sizeof(DWORD);
+        RegGetValue(regKey, L"AC Power", L"Width", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.width, &keySize);
+        keySize = sizeof(DWORD);
+        RegGetValue(regKey, L"AC Power", L"Height", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.height, &keySize);
+        keySize = sizeof(DWORD);
+        RegGetValue(regKey, L"AC Power", L"Refresh Rate", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.refresh, &keySize);
+        return TRUE;
+    }
+    else return FALSE;
+}
+
 static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
     switch (message) {
     case WM_INITDIALOG: {
@@ -154,21 +197,17 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
 
                 // Add to both combo boxes and check if this is the mode that was set.
                 SendMessage(hComboBatt, CB_ADDSTRING, 0, (LPARAM)resText);
-                if (DisplayModeEquals(&modeBatt, &currentMode))
+                if (DisplayModeEquals(&userPrefs.modeBatt, &currentMode))
                     SendMessage(hComboBatt, CB_SETCURSEL, modeCount, 0);
 
                 SendMessage(hComboAC, CB_ADDSTRING, 0, (LPARAM)resText);
-                if (DisplayModeEquals(&modeAC, &currentMode))
+                if (DisplayModeEquals(&userPrefs.modeAC, &currentMode))
                     SendMessage(hComboAC, CB_SETCURSEL, modeCount, 0);
                 
                 ++modeCount;
                 lastMode = currentMode;
             }
         }
-
-        // select the highest display mode if one hasn't been selected yet
-        if (!MODE_SELECTED(modeBatt)) SendMessage(hComboBatt, CB_SETCURSEL, modeCount - 1, 0);
-        if (!MODE_SELECTED(modeAC)) SendMessage(hComboAC, CB_SETCURSEL, modeCount - 1, 0);
         return TRUE;
     }
 
@@ -176,8 +215,9 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         switch (LOWORD(wParam)) {
         case IDC_BUTTON_APPLY:
         case IDOK: {
-            modeBatt = GetModeFromCB(hDlg, IDC_COMBO_BATT);
-            modeAC = GetModeFromCB(hDlg, IDC_COMBO_AC);
+            userPrefs.modeBatt = GetModeFromCB(hDlg, IDC_COMBO_BATT);
+            userPrefs.modeAC = GetModeFromCB(hDlg, IDC_COMBO_AC);
+            SavePrefs();
             if (LOWORD(wParam) == IDC_BUTTON_APPLY) return TRUE;
         }
         case IDCANCEL: {
@@ -208,18 +248,17 @@ enum TRAY_IDS {
 };
 
 static NOTIFYICONDATA nid;
-static HWND hWnd;
 static HMENU hMenu;
 
-static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_TRAYICON:
         if (lParam == WM_RBUTTONUP) {
             POINT pt;
             GetCursorPos(&pt);
-            SetForegroundWindow(hwnd); // Required for menu to disappear correctly
+            SetForegroundWindow(hWnd); // Required for menu to disappear correctly
 
-            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hWnd, NULL);
         }
         break;
 
@@ -232,7 +271,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
             MessageBoxW(NULL, L"WinPowerDMS\nA utility for switching the resolution of your laptop's display based on the current power state.", L"About", MB_OK | MB_ICONINFORMATION);
             break;
         case ID_TRAY_EXIT:
-            DestroyWindow(hwnd);
+            DestroyWindow(hWnd);
             break;
         }
         break;
@@ -247,17 +286,28 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
             OutputDebugString(L"Power status changed\n");
             SYSTEM_POWER_STATUS powerStatus;
             if (GetSystemPowerStatus(&powerStatus)) {
-                ChangeDisplayMode(powerStatus.ACLineStatus ? &modeAC : &modeBatt, CDS_UPDATEREGISTRY);
+                ChangeDisplayMode(powerStatus.ACLineStatus ? &userPrefs.modeAC : &userPrefs.modeBatt, CDS_UPDATEREGISTRY);
             }
         }
         break;
     }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return DefWindowProc(hWnd, uMsg, wParam, lParam);
 }
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    // Initialize the controls
-    InitCommonControls();
+    if (!LoadPrefs()) { // set both battery and AC to current display mode if there are no preferences set
+        DEVMODE currentMode = { .dmSize = sizeof(currentMode) };
+        EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &currentMode);
+        DISPLAY_MODE mode = {
+            .width = currentMode.dmPelsWidth,
+            .height = currentMode.dmPelsHeight,
+            .refresh = currentMode.dmDisplayFrequency
+        };
+        userPrefs.modeAC = mode;
+        userPrefs.modeBatt = mode;
+    }
+
+    InitCommonControls(); // Initialize modern controls
 
     WNDCLASS wc = { 0 };
     wc.lpfnWndProc = WindowProc;
@@ -266,7 +316,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     RegisterClass(&wc);
 
-    hWnd = CreateWindowEx(0, L"TrayAppClass", NULL, 0, 0, 0, 0, 0,
+    HWND hWnd = CreateWindowEx(0, L"TrayAppClass", NULL, 0, 0, 0, 0, 0,
         HWND_MESSAGE, NULL, hInstance, NULL);
     RegisterPowerSettingNotification(hWnd, &GUID_ACDC_POWER_SOURCE, DEVICE_NOTIFY_WINDOW_HANDLE);
 
