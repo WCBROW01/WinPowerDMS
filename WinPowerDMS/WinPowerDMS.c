@@ -28,7 +28,7 @@ BOOL DisplayModeEquals(const DISPLAY_MODE* a, const DISPLAY_MODE* b) {
 // I hate parsing the string here, but the alternative requires extra memory management.
 static DISPLAY_MODE GetModeFromCB(HWND hComboBox) {
     DISPLAY_MODE mode = { 0 };
-    size_t selectedIndex = SendMessage(hComboBox, CB_GETCURSEL, 0, 0);
+    LRESULT selectedIndex = SendMessage(hComboBox, CB_GETCURSEL, 0, 0);
     if (selectedIndex != CB_ERR) {
         LRESULT len = SendMessage(hComboBox, CB_GETLBTEXTLEN, selectedIndex, 0);
         if (len != CB_ERR) {
@@ -203,13 +203,13 @@ static DISPLAY_MODE GetCurrentDisplayMode(void) {
     };
 }
 
-static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
+static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     HWND hComboBatt = GetDlgItem(hDlg, IDC_COMBO_BATT);
     HWND hComboAC = GetDlgItem(hDlg, IDC_COMBO_AC);
     HWND hCheckBattWarning = GetDlgItem(hDlg, IDC_CHECK_BATT_WARNING);
     HWND hCheckStartup = GetDlgItem(hCheckBattWarning, IDC_CHECK_STARTUP);
 
-    switch (message) {
+    switch (uMsg) {
     case WM_INITDIALOG: {
         // devMode object that will be enumerated
         DEVMODE devMode;
@@ -217,7 +217,7 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT message, WPARAM wParam, 
         devMode.dmSize = sizeof(devMode);
 
         size_t modeCount = 0;
-        int modeNum = 0;
+        DWORD modeNum = 0;
         DISPLAY_MODE lastMode = { 0 };
         while (EnumDisplaySettings(NULL, modeNum++, &devMode)) {
             DISPLAY_MODE currentMode = {
@@ -372,12 +372,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, L"Exit");
 
     // Setup tray icon
+    HICON hTrayIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_APPICON));
     nid.cbSize = sizeof(NOTIFYICONDATA);
     nid.hWnd = hWnd;
     nid.uID = TRAY_ICON_ID;
     nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION); // Replace this with my own icon at some point
+    nid.hIcon = hTrayIcon;
     wcscpy_s(nid.szTip, sizeof(nid.szTip) / sizeof(nid.szTip[0]), L"WinPowerDMS");
 
     Shell_NotifyIcon(NIM_ADD, &nid);
@@ -389,5 +390,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         DispatchMessage(&msg);
     }
 
+    DestroyIcon(hTrayIcon);
     return 0;
 }
