@@ -10,8 +10,7 @@
 #define IDC_BUTTON_TEST_AC              1004
 #define IDC_BUTTON_APPLY                1005
 #define IDC_LIST1                       1006
-#define IDC_CHECK_BATT_WARNING          1007
-#define IDC_CHECK_STARTUP               1008
+#define IDC_CHECK_STARTUP               1007
 
 // Next default values for new objects
 // 

@@ -124,7 +124,6 @@ static void TestDisplayMode(HWND hDlg, DISPLAY_MODE* mode) {
 typedef struct {
     DISPLAY_MODE modeBatt;
     DISPLAY_MODE modeAC;
-    DWORD disableBatteryWarning;
     BOOL runAtStartup;
 } WINPOWERDMS_PREFS;
 
@@ -145,7 +144,6 @@ static BOOL SavePrefs(void) {
         RegSetKeyValue(regKey, L"AC Power", L"Width", REG_DWORD, &userPrefs.modeAC.width, sizeof(userPrefs.modeAC.width));
         RegSetKeyValue(regKey, L"AC Power", L"Height", REG_DWORD, &userPrefs.modeAC.height, sizeof(userPrefs.modeAC.height));
         RegSetKeyValue(regKey, L"AC Power", L"Refresh Rate", REG_DWORD, &userPrefs.modeAC.refresh, sizeof(userPrefs.modeAC.refresh));
-        RegSetValueEx(regKey, L"Disable Battery Warning", 0, REG_DWORD, &userPrefs.disableBatteryWarning, sizeof(userPrefs.disableBatteryWarning));
         RegCloseKey(regKey);
         saved = TRUE;
     }
@@ -180,8 +178,6 @@ static BOOL LoadPrefs(void) {
         RegGetValue(regKey, L"AC Power", L"Height", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.height, &keySize);
         keySize = sizeof(userPrefs.modeAC.refresh);
         RegGetValue(regKey, L"AC Power", L"Refresh Rate", RRF_RT_REG_DWORD, NULL, &userPrefs.modeAC.refresh, &keySize);
-        keySize = sizeof(userPrefs.disableBatteryWarning);
-        RegGetValue(regKey, NULL, L"Disable Battery Warning", RRF_RT_REG_DWORD, NULL, &userPrefs.disableBatteryWarning, &keySize);
         RegCloseKey(regKey);
         loaded = TRUE;
     }
@@ -206,8 +202,7 @@ static DISPLAY_MODE GetCurrentDisplayMode(void) {
 static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     HWND hComboBatt = GetDlgItem(hDlg, IDC_COMBO_BATT);
     HWND hComboAC = GetDlgItem(hDlg, IDC_COMBO_AC);
-    HWND hCheckBattWarning = GetDlgItem(hDlg, IDC_CHECK_BATT_WARNING);
-    HWND hCheckStartup = GetDlgItem(hCheckBattWarning, IDC_CHECK_STARTUP);
+    HWND hCheckStartup = GetDlgItem(hDlg, IDC_CHECK_STARTUP);
 
     switch (uMsg) {
     case WM_INITDIALOG: {
@@ -246,7 +241,6 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPA
             }
         }
 
-        SendMessage(hCheckBattWarning, BM_SETCHECK, userPrefs.disableBatteryWarning ? BST_CHECKED : BST_UNCHECKED, 0);
         SendMessage(hCheckStartup, BM_SETCHECK, userPrefs.runAtStartup ? BST_CHECKED : BST_UNCHECKED, 0);
         return TRUE;
     }
@@ -257,7 +251,6 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPA
         case IDOK: {
             userPrefs.modeBatt = GetModeFromCB(hComboBatt);
             userPrefs.modeAC = GetModeFromCB(hComboAC);
-            userPrefs.disableBatteryWarning = SendMessage(hCheckBattWarning, BM_GETCHECK, 0, 0) == BST_CHECKED;
             userPrefs.runAtStartup = SendMessage(hCheckStartup, BM_GETCHECK, 0, 0) == BST_CHECKED;
             SavePrefs();
             if (LOWORD(wParam) == IDC_BUTTON_APPLY) return TRUE;
@@ -359,11 +352,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     HWND hWnd = CreateWindowEx(0, L"TrayAppClass", NULL, 0, 0, 0, 0, 0,
         HWND_MESSAGE, NULL, hInstance, NULL);
     RegisterPowerSettingNotification(hWnd, &GUID_ACDC_POWER_SOURCE, DEVICE_NOTIFY_WINDOW_HANDLE);
-    
-    // Check if there is a battery in the system and display a warning message if there isn't one.
-    SYSTEM_POWER_STATUS powerStatus;
-    if (!userPrefs.disableBatteryWarning && GetSystemPowerStatus(&powerStatus) && powerStatus.BatteryFlag == 128)
-        MessageBox(hWnd, L"There is no battery present in the system. The program will start and set your display mode to what you have set for AC power, but do nothing else afterwards.", L"WinPowerDMS", MB_OK | MB_ICONWARNING);
 
     // Create context menu
     hMenu = CreatePopupMenu();
