@@ -82,9 +82,10 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ComCtl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <MinimumRequiredVersion>6.0</MinimumRequiredVersion>
     </Link>
     <Manifest>
-      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -100,9 +101,10 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ComCtl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <MinimumRequiredVersion>6.0</MinimumRequiredVersion>
     </Link>
     <Manifest>
-      <EnableDpiAwareness>PerMonitorHighDPIAware</EnableDpiAwareness>
+      <EnableDpiAwareness>true</EnableDpiAwareness>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -116,6 +118,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ComCtl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <MinimumRequiredVersion>6.0</MinimumRequiredVersion>
     </Link>
     <Manifest>
       <EnableDpiAwareness>true</EnableDpiAwareness>
@@ -134,6 +137,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ComCtl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <MinimumRequiredVersion>6.0</MinimumRequiredVersion>
     </Link>
     <Manifest>
       <EnableDpiAwareness>true</EnableDpiAwareness>
