@@ -2,9 +2,9 @@
 
 A utility for switching the resolution of your laptop's display based on the current power state.
 
-Currently a work in progress. Not very useful yet since it doesn't save your preferences. It doesn't even have an icon.
+Currently a work in progress. It works reasonably well for a standard single display configuration, but other scenarios have not been extensively tested, and there are some edge cases that may need to be worked out.
 
-This is a simple C program written using Visual Studio 2022 that has no external dependencies. It should support Windows Vista or higher, but this hasn't been tested yet.
+This is a simple C program written using Visual Studio 2022 that has no external dependencies. It supports Windows Vista or higher.
 
 ## TODO
 - [x] Save preferences to the Windows registry.
