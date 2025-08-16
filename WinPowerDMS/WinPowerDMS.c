@@ -87,7 +87,7 @@ static BOOL LoadPrefs(void) {
 }
 
 static DISPLAY_MODE GetCurrentDisplayMode(void) {
-    DEVMODE currentMode = { .dmSize = sizeof(currentMode) };
+    DEVMODEW currentMode = { .dmSize = sizeof(currentMode) };
     EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &currentMode);
     return (DISPLAY_MODE) {
         .width = currentMode.dmPelsWidth,
@@ -104,7 +104,7 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPA
     switch (uMsg) {
     case WM_INITDIALOG: {
         // devMode object that will be enumerated
-        DEVMODE devMode;
+        DEVMODEW devMode;
         ZeroMemory(&devMode, sizeof(devMode));
         devMode.dmSize = sizeof(devMode);
 

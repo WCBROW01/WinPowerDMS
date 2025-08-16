@@ -30,7 +30,7 @@ DISPLAY_MODE GetModeFromCB(HWND hComboBox) {
 
 // returns the result of the ChangeDisplaySettings call that this results in.
 LONG ChangeDisplayMode(LPCWSTR displayName, const DISPLAY_MODE* mode, DWORD dwFlags) {
-    DEVMODE devMode = {
+    DEVMODEW devMode = {
         .dmSize = sizeof(devMode),
         .dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY,
         .dmPelsWidth = mode->width,
@@ -62,7 +62,7 @@ struct TestDisplayModeParams {
 
 static DWORD WINAPI TestDisplayModeThread(LPVOID lpParam) {
     struct TestDisplayModeParams* params = lpParam;
-    DEVMODE originalMode = { .dmSize = sizeof(originalMode) };
+    DEVMODEW originalMode = { .dmSize = sizeof(originalMode) };
     EnumDisplaySettings(params->displayName, ENUM_CURRENT_SETTINGS, &originalMode);
     ChangeDisplayMode(params->displayName, &params->mode, CDS_FULLSCREEN);
 
