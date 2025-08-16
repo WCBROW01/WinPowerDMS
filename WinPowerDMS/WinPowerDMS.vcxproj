@@ -144,9 +144,11 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="DisplayMode.c" />
     <ClCompile Include="WinPowerDMS.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="DisplayMode.h" />
     <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
