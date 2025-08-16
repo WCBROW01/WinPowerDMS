@@ -29,7 +29,7 @@ DISPLAY_MODE GetModeFromCB(HWND hComboBox) {
 }
 
 // returns the result of the ChangeDisplaySettings call that this results in.
-LONG ChangeDisplayMode(const DISPLAY_MODE* mode, DWORD dwFlags) {
+LONG ChangeDisplayMode(LPCWSTR displayName, const DISPLAY_MODE* mode, DWORD dwFlags) {
     DEVMODE devMode = {
         .dmSize = sizeof(devMode),
         .dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY,
@@ -37,6 +37,7 @@ LONG ChangeDisplayMode(const DISPLAY_MODE* mode, DWORD dwFlags) {
         .dmPelsHeight = mode->height,
         .dmDisplayFrequency = mode->refresh
     };
+    if (displayName) wcscpy_s(devMode.dmDeviceName, sizeof(devMode.dmDeviceName) / sizeof(devMode.dmDeviceName[0]), displayName);
 
     return ChangeDisplaySettings(&devMode, dwFlags);
 }
@@ -55,14 +56,15 @@ static DWORD WINAPI MessageBoxAsync(LPVOID lpParam) {
 
 struct TestDisplayModeParams {
     HWND hDlg;
+    WCHAR displayName[32];
     DISPLAY_MODE mode;
 };
 
 static DWORD WINAPI TestDisplayModeThread(LPVOID lpParam) {
     struct TestDisplayModeParams* params = lpParam;
     DEVMODE originalMode = { .dmSize = sizeof(originalMode) };
-    EnumDisplaySettings(NULL, ENUM_CURRENT_SETTINGS, &originalMode);
-    ChangeDisplayMode(&params->mode, CDS_FULLSCREEN);
+    EnumDisplaySettings(params->displayName, ENUM_CURRENT_SETTINGS, &originalMode);
+    ChangeDisplayMode(params->displayName, &params->mode, CDS_FULLSCREEN);
 
     // Create the message box about the resolution change
     WCHAR msgText[96];
@@ -88,10 +90,11 @@ static DWORD WINAPI TestDisplayModeThread(LPVOID lpParam) {
     return 0;
 }
 
-void TestDisplayMode(HWND hDlg, DISPLAY_MODE* mode) {
+void TestDisplayMode(HWND hDlg, LPCWSTR displayName, DISPLAY_MODE* mode) {
     struct TestDisplayModeParams* tdmParams = HeapAlloc(GetProcessHeap(), 0, sizeof(*tdmParams));
     if (tdmParams) {
         tdmParams->hDlg = hDlg;
+        if (tdmParams->displayName) wcscpy_s(tdmParams->displayName, sizeof(tdmParams->displayName) / sizeof(tdmParams->displayName[0]), displayName);
         tdmParams->mode = *mode;
         HANDLE tdmThread = CreateThread(NULL, 0, TestDisplayModeThread, tdmParams, 0, NULL);
         if (tdmThread) CloseHandle(tdmThread);

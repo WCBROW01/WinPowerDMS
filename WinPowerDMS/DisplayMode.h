@@ -14,6 +14,6 @@ BOOL DisplayModeEquals(const DISPLAY_MODE* a, const DISPLAY_MODE* b);
 DISPLAY_MODE GetModeFromCB(HWND hComboBox);
 
 // returns the result of the ChangeDisplaySettings call that this results in.
-LONG ChangeDisplayMode(const DISPLAY_MODE* mode, DWORD dwFlags);
+LONG ChangeDisplayMode(LPCWSTR displayName, const DISPLAY_MODE* mode, DWORD dwFlags);
 
-void TestDisplayMode(HWND hDlg, DISPLAY_MODE* mode);
+void TestDisplayMode(HWND hDlg, LPCWSTR displayName,  DISPLAY_MODE* mode);

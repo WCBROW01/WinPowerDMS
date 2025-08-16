@@ -141,7 +141,7 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPA
         SendMessage(hCheckStartup, BM_SETCHECK, userPrefs.runAtStartup ? BST_CHECKED : BST_UNCHECKED, 0);
         return TRUE;
     }
-
+                      
     case WM_COMMAND: {
         switch (LOWORD(wParam)) {
         case IDC_BUTTON_APPLY:
@@ -158,12 +158,12 @@ static INT_PTR CALLBACK PrefsDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPA
         }
         case IDC_BUTTON_TEST_BATT: {
             DISPLAY_MODE mode = GetModeFromCB(hComboBatt);
-            TestDisplayMode(hDlg, &mode);
+            TestDisplayMode(hDlg, NULL, &mode);
             return TRUE;
         }
         case IDC_BUTTON_TEST_AC: {
             DISPLAY_MODE mode = GetModeFromCB(hComboAC);
-            TestDisplayMode(hDlg, &mode);
+            TestDisplayMode(hDlg, NULL, &mode);
             return TRUE;
         }
         break;
@@ -222,7 +222,7 @@ static LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             if (GetSystemPowerStatus(&powerStatus) &&
                 (DisplayModeEquals(&currentMode, &userPrefs.modeBatt) || DisplayModeEquals(&currentMode, &userPrefs.modeAC)))
             {
-                ChangeDisplayMode(powerStatus.ACLineStatus ? &userPrefs.modeAC : &userPrefs.modeBatt, CDS_UPDATEREGISTRY);
+                ChangeDisplayMode(NULL, powerStatus.ACLineStatus ? &userPrefs.modeAC : &userPrefs.modeBatt, CDS_UPDATEREGISTRY);
             }
         }
         break;
